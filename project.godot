@@ -13,6 +13,14 @@ config_version=4
 config/name="Game Off 2023"
 config/icon="res://icon.png"
 
+[display]
+
+window/size/width=320
+window/size/height=240
+window/size/test_width=960
+window/size/test_height=720
+window/stretch/mode="viewport"
+
 [gui]
 
 common/drop_mouse_on_gui_input_disabled=true

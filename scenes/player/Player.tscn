@@ -1,6 +1,7 @@
-[gd_scene load_steps=9 format=2]
+[gd_scene load_steps=10 format=2]
 
 [ext_resource path="res://assets/player/demo_player_spritesheet.png" type="Texture" id=1]
+[ext_resource path="res://scenes/player/Player.gd" type="Script" id=2]
 
 [sub_resource type="Animation" id=1]
 length = 0.001
@@ -85,6 +86,7 @@ tracks/0/keys = {
 [sub_resource type="Animation" id=6]
 resource_name = "run"
 length = 0.4
+loop = true
 tracks/0/type = "value"
 tracks/0/path = NodePath("Sprite:frame")
 tracks/0/interp = 1
@@ -102,6 +104,7 @@ tracks/0/keys = {
 extents = Vector2( 6.5, 8 )
 
 [node name="Player" type="KinematicBody2D"]
+script = ExtResource( 2 )
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="."]
 anims/RESET = SubResource( 1 )
