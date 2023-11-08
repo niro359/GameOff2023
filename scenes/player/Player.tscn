@@ -106,7 +106,8 @@ animations = [ {
 [sub_resource type="RectangleShape2D" id=32]
 extents = Vector2( 8, 16 )
 
-[node name="Player" type="KinematicBody2D"]
+[node name="Player" type="KinematicBody2D" groups=["player"]]
+collision_layer = 512
 script = ExtResource( 2 )
 
 [node name="Camera2D" type="Camera2D" parent="."]
@@ -128,3 +129,5 @@ animation = "run"
 [node name="BigCollision" type="CollisionShape2D" parent="."]
 position = Vector2( 0, -8 )
 shape = SubResource( 32 )
+
+[node name="FlickerTimer" type="Timer" parent="."]
