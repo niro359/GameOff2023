@@ -1,5 +1,8 @@
 extends KinematicBody2D
 
+# At the top of the script
+export (PackedScene) var ProjectileScene
+
 enum States { HIDING, ACTIVE, TRANSITION, KNOCKED_BACK }
 var current_state = States.HIDING
 var speed = 50
@@ -10,9 +13,6 @@ var random_movement_timer = Timer.new()
 var flip_cooldown = 0.5
 var can_flip = true
 
-# Idle state properties
-var idle_timer = Timer.new()
-const IDLE_DURATION = 2.0
 
 # Health and knockback properties
 var max_health = 3
@@ -22,6 +22,11 @@ var is_knockback = false
 const KNOCKBACK_TIME = 0.2
 const KNOCKBACK_FORCE = Vector2(50, -150)
 
+# Active state properties
+var shooting_timer = Timer.new()
+const SHOOTING_INTERVAL = 1.0  # seconds between shots
+var projectile_rotation_degrees : float = 0
+
 onready var player = get_tree().get_nodes_in_group("player")[0]
 var is_player_small = false
 
@@ -29,7 +34,12 @@ var direction: int = 1
 
 func _ready():
 	player.connect("player_scaled", self, "_on_player_scaled")
-	set_state(States.HIDING)
+	set_state(States.ACTIVE)
+	# Existing setup
+	shooting_timer.wait_time = SHOOTING_INTERVAL
+	shooting_timer.one_shot = false
+	shooting_timer.connect("timeout", self, "_on_shooting_timer_timeout")
+	add_child(shooting_timer)
 
 func _process(delta):
 	match current_state:
@@ -57,29 +67,53 @@ func set_state(new_state):
 			# Setup transition (e.g., play animation)
 
 func handle_hiding_state(delta):
-	# Apply gravity even when idle to keep grounded
+	# Apply gravity
 	velocity.y += gravity * delta
 	velocity = move_and_slide(velocity, Vector2.UP)
-	# Logic for when in hiding state
+
+	# Stop shooting
+	if shooting_timer.time_left > 0:
+		shooting_timer.stop()
+
 
 func handle_active_state(delta):
-	# Apply gravity even when idle to keep grounded
+	# Apply gravity
 	velocity.y += gravity * delta
 	velocity = move_and_slide(velocity, Vector2.UP)
-	# Logic for when in active state (e.g., shooting projectiles)
+
+	# Flip the sprite based on player position
+	if player.global_position.x < global_position.x:
+		$Sprite.flip_h = true  # Player is to the left
+	else:
+		$Sprite.flip_h = false  # Player is to the right
+
+	# Start shooting
+	if shooting_timer.time_left == 0:
+		shooting_timer.start()
+
+
 
 func handle_transition_state(delta):
-	# Apply gravity even when idle to keep grounded
+	# Apply gravity
 	velocity.y += gravity * delta
 	velocity = move_and_slide(velocity, Vector2.UP)
-	# Logic for handling transitions between states
+
+	# Transition logic
+	if is_player_small:
+		# Transition to active if player is small
+		shooting_timer.start()
+		set_state(States.ACTIVE)
+	else:
+		# Transition to hiding if player is big
+		shooting_timer.stop()
+		set_state(States.HIDING)
+
 
 func _on_player_scaled(new_is_small):
 	is_player_small = new_is_small
-	if is_player_small:
-		set_state(States.TRANSITION) # Transition to active state
-	else:
-		set_state(States.TRANSITION) # Transition to hiding state
+	# Trigger transition state whenever player size changes
+	set_state(States.TRANSITION)
+
 
 
 # Enemy script
@@ -99,12 +133,17 @@ func handle_knockback_state(delta):
 	# Apply gravity to the knockback
 	knockback_velocity.y += gravity * delta
 
-	# Use move_and_slide to move the Pulse Pacer
+	# Use move_and_slide to move the Sneak Shooter
 	knockback_velocity = move_and_slide(knockback_velocity, Vector2.UP)
 
-	# If the Pulse Pacer hits the ground, transition out of knockback state
+	# Check if the Sneak Shooter hits the ground
 	if is_on_floor():
-		current_state = States.HIDING
+		# Decide next state based on the player's size
+		if is_player_small:
+			set_state(States.ACTIVE)
+		else:
+			set_state(States.HIDING)
+
 
 
 func apply_knockback(direction):
@@ -120,3 +159,19 @@ func take_damage(amount, direction):
 		queue_free()  # Or any other logic for when health reaches zero
 	else:
 		apply_knockback(direction)
+
+
+func _on_shooting_timer_timeout():
+	if current_state == States.ACTIVE:
+		# Determine the horizontal direction towards the player
+		var horizontal_direction = sign(player.global_position.x - global_position.x)
+		var projectile = ProjectileScene.instance()
+		projectile.global_position = global_position
+		if horizontal_direction == -1:
+			projectile_rotation_degrees = 0
+		elif horizontal_direction == 1:
+			projectile_rotation_degrees = 180
+		projectile.rotation_degrees = projectile_rotation_degrees
+		projectile.direction = Vector2(horizontal_direction, 0)
+
+		get_parent().add_child(projectile)
