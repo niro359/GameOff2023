@@ -27,7 +27,6 @@ var knockback_velocity = Vector2.ZERO
 var is_knockback = false
 const KNOCKBACK_TIME = 0.2
 const KNOCKBACK_FORCE = Vector2(50, -150)
-var knockback_timer = Timer.new()
 
 # Player reference
 onready var player = get_tree().get_nodes_in_group("player")[0]
@@ -40,9 +39,8 @@ var direction: int = 1
 
 func _ready():
 	player.connect("player_scaled", self, "_on_player_scaled")
-	add_child(knockback_timer)
-	knockback_timer.connect("timeout", self, "_on_knockback_timer_timeout")
 	add_child(idle_timer)
+	add_child(random_movement_timer)
 	idle_timer.wait_time = IDLE_DURATION
 	idle_timer.one_shot = true
 	idle_timer.connect("timeout", self, "_on_idle_timer_timeout")
@@ -110,8 +108,6 @@ func apply_knockback(direction):
 	is_knockback = true
 	var vertical_force = Vector2(0, -150)
 	knockback_velocity = KNOCKBACK_FORCE * direction.normalized() + vertical_force
-	knockback_timer.start(KNOCKBACK_TIME)
-	emit_signal("enemy_knocked_back")
 
 func _on_random_movement_timer_timeout():
 	# Randomly decide whether to change direction
