@@ -174,10 +174,6 @@ func toggle_scale():
 		print("No scale charges left")
 		return  # Do not change scale if there are no charges left
 
-	# Stop any flickering and reset sprite visibility before scaling
-	if flicker_timer.is_stopped() == false:
-		flicker_timer.stop()
-		_reset_sprite_visibility()
 
 	# Only check for space if the player is small and trying to grow
 	if is_small:
@@ -202,12 +198,12 @@ func toggle_scale():
 		if result.size() > 0:
 			print("Not enough space to grow")
 			return # Do not change scale if there's a collision
-
+	
 	# If there's enough room or if shrinking, proceed with scaling
 	is_small = !is_small
 	scale_charges -= 1  # Consume a charge
 	update_collision_and_visibility()
-
+	velocity.y = JUMP_FORCE
 	# Emit signal after changing scale
 	emit_signal("player_scaled", is_small)
 
