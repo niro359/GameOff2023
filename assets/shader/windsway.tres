@@ -1,0 +1,21 @@
+[gd_resource type="Shader" format=2]
+
+[resource]
+code = "shader_type canvas_item;
+
+// Parameters to control the wind effect
+uniform float strength : hint_range(0.0, 10.0) = 2.0; // How much the pixels move
+uniform float frequency : hint_range(0.0, 10.0) = 2.0; // How fast the movement is
+
+void fragment() {
+    // Calculate the wind effect using a sine wave
+    float wind_effect = sin(TIME * frequency + UV.y * 10.0) * strength;
+
+    // Create a new variable for modified UV coordinates
+    vec2 modified_uv = UV;
+    modified_uv.x += wind_effect * 0.005; // The 0.005 factor reduces the effect to a subtle level
+
+    // Get the color from the texture with the modified UV coordinates
+    COLOR = texture(TEXTURE, modified_uv);
+}
+"
