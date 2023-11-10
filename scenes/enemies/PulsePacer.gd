@@ -122,7 +122,7 @@ func _on_player_scaled(new_is_small):
 		random_movement_timer.start()  # Make the Pulse Pacer move randomly again
 	else:
 		# If the player is big, increase the Pulse Pacer's speed and chase the player
-		speed = 200
+		speed = 150
 		random_movement_timer.stop()  # Stop random movement
 		# Point the direction towards the player
 		direction = sign(player.global_position.x - global_position.x)

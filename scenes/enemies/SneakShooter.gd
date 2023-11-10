@@ -26,8 +26,11 @@ const KNOCKBACK_FORCE = Vector2(50, -150)
 var shooting_timer = Timer.new()
 const SHOOTING_INTERVAL = 1.0  # seconds between shots
 var projectile_rotation_degrees : float = 0
+const SAME_LEVEL_THRESHOLD = 100  # pixels, adjust as needed
 
 onready var player = get_tree().get_nodes_in_group("player")[0]
+# At the top of your enemy script
+onready var player_ref = weakref(player)
 var is_player_small = false
 
 var direction: int = 1
@@ -42,15 +45,20 @@ func _ready():
 	add_child(shooting_timer)
 
 func _process(delta):
-	match current_state:
-		States.HIDING:
-			handle_hiding_state(delta)
-		States.ACTIVE:
-			handle_active_state(delta)
-		States.TRANSITION:
-			handle_transition_state(delta)
-		States.KNOCKED_BACK:
-			handle_knockback_state(delta)
+	var player_instance = player_ref.get_ref()
+	if player_instance:
+		match current_state:
+			States.HIDING:
+				handle_hiding_state(delta)
+			States.ACTIVE:
+				handle_active_state(delta)
+			States.TRANSITION:
+				handle_transition_state(delta)
+			States.KNOCKED_BACK:
+				handle_knockback_state(delta)
+	else:
+		# Player does not exist or has been freed
+		pass
 
 
 func set_state(new_state):
@@ -80,16 +88,24 @@ func handle_active_state(delta):
 	# Apply gravity
 	velocity.y += gravity * delta
 	velocity = move_and_slide(velocity, Vector2.UP)
-
+	
 	# Flip the sprite based on player position
 	if player.global_position.x < global_position.x:
 		$Sprite.flip_h = true  # Player is to the left
 	else:
 		$Sprite.flip_h = false  # Player is to the right
 
-	# Start shooting
-	if shooting_timer.time_left == 0:
-		shooting_timer.start()
+	# Check if the player is on the same level
+	var vertical_distance = abs(player.global_position.y - global_position.y)
+	if vertical_distance <= SAME_LEVEL_THRESHOLD:
+		# Start shooting if not already started
+		if shooting_timer.time_left == 0:
+			shooting_timer.start()
+	else:
+		# Stop shooting if the player is not on the same level
+		if shooting_timer.time_left > 0:
+			shooting_timer.stop()
+
 
 
 
@@ -138,12 +154,10 @@ func handle_knockback_state(delta):
 
 	# Check if the Sneak Shooter hits the ground
 	if is_on_floor():
-		# Decide next state based on the player's size
-		if is_player_small:
+		if player.is_small:
 			set_state(States.ACTIVE)
 		else:
 			set_state(States.HIDING)
-
 
 
 func apply_knockback(direction):
@@ -162,16 +176,20 @@ func take_damage(amount, direction):
 
 
 func _on_shooting_timer_timeout():
-	if current_state == States.ACTIVE:
-		# Determine the horizontal direction towards the player
-		var horizontal_direction = sign(player.global_position.x - global_position.x)
-		var projectile = ProjectileScene.instance()
-		projectile.global_position = global_position
-		if horizontal_direction == -1:
-			projectile_rotation_degrees = 0
-		elif horizontal_direction == 1:
-			projectile_rotation_degrees = 180
-		projectile.rotation_degrees = projectile_rotation_degrees
-		projectile.direction = Vector2(horizontal_direction, 0)
+	var player_instance = player_ref.get_ref()
+	if player_instance:
+		if current_state == States.ACTIVE:
+			# Determine the horizontal direction towards the player
+			var horizontal_direction = sign(player.global_position.x - global_position.x)
+			var projectile = ProjectileScene.instance()
+			projectile.global_position = global_position
+			if horizontal_direction == -1:
+				projectile_rotation_degrees = 0
+			elif horizontal_direction == 1:
+				projectile_rotation_degrees = 180
+			projectile.rotation_degrees = projectile_rotation_degrees
+			projectile.direction = Vector2(horizontal_direction, 0)
 
-		get_parent().add_child(projectile)
+			get_parent().add_child(projectile)
+	else:
+		pass

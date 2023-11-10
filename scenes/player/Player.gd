@@ -52,6 +52,8 @@ var knockback_timer = Timer.new() # Handles the duration of the knockback
 var max_health = 3
 var health = max_health
 
+var camera_last_position = Vector2()
+
 onready var small_sprite = $SmallSprite
 onready var small_collision = $SmallCollision
 onready var big_sprite = $BigSprite
@@ -174,7 +176,6 @@ func toggle_scale():
 		print("No scale charges left")
 		return  # Do not change scale if there are no charges left
 
-
 	# Only check for space if the player is small and trying to grow
 	if is_small:
 		var space_state = get_world_2d().direct_space_state
@@ -183,28 +184,25 @@ func toggle_scale():
 		query_parameters.set_shape(big_collision.shape)
 		query_parameters.transform = big_collision.global_transform
 
-		# Assuming the pivot point is at the bottom of the sprite,
-		# you need to check the space above the player. Adjust the y-offset
-		# according to the difference in height between the small and big shapes.
 		var offset_y = small_collision.shape.extents.y - big_collision.shape.extents.y
 		query_parameters.transform.origin = global_position + Vector2(0, offset_y)
 
-		# Exclude the player's own collision shape from the query
 		query_parameters.exclude = [self, small_collision, big_collision]
 
-		# Perform the overlap check
 		var result = space_state.intersect_shape(query_parameters)
-		# If there's a collision with anything other than the player, don't grow
-		if result.size() > 0:
-			print("Not enough space to grow")
-			return # Do not change scale if there's a collision
-	
+		
+		for collision_info in result:
+			if collision_info.collider and collision_info.collider.is_in_group("OneWayPlatforms"):
+				continue  # It's a one-way platform; allow scaling
+			else:
+				print("Not enough space to grow")
+				return # Collision with non-one-way-platform
+
 	# If there's enough room or if shrinking, proceed with scaling
 	is_small = !is_small
 	scale_charges -= 1  # Consume a charge
 	update_collision_and_visibility()
 	velocity.y = JUMP_FORCE
-	# Emit signal after changing scale
 	emit_signal("player_scaled", is_small)
 
 
@@ -233,7 +231,7 @@ func reduce_health(amount, knockback_direction):
 	health = max(health, 0)  # Prevent health from going below 0
 	update_debug_text()
 	
-	if health >= 0:
+	if health > 0:
 		is_knockback = true
 		# Use the direction provided to set the horizontal knockback
 		velocity.x = knockback_strength.x * knockback_direction.x
@@ -286,5 +284,21 @@ func set_state(new_state):
 
 
 func die():
-	pass
-	# Handle player death as before...
+	# Check if the Camera2D is still a valid node
+	if $Camera2D:
+		# Store the current camera position
+		camera_last_position = $Camera2D.global_position
+
+		# Detach the Camera2D from the player
+		var camera = $Camera2D
+		camera.get_parent().remove_child(camera)
+
+		# Immediately set the camera position after detaching
+		camera.global_position = camera_last_position
+
+		# Add the camera to the root node
+		get_tree().get_root().add_child(camera)
+
+	# Then free the player
+	queue_free()
+
