@@ -17,11 +17,13 @@ var state_descriptions = {
 	PlayerState.KNOCKBACK: "KnockBack"
 }
 
-const SPEED = 125
+const SPEED = 75
 const GRAVITY = 800
-const JUMP_FORCE = -200
+const JUMP_FORCE = -175
 const MAX_JUMP_TIME = 0.2
 const MAX_SCALE_CHARGES = 3  # The maximum number of scale changes the player can have
+const ONE_WAY_PLATFORM_LAYER_BIT = 1
+var drop_through_timer = null
 
 var velocity = Vector2.ZERO
 var current_state = PlayerState.IDLE
@@ -78,6 +80,10 @@ func _ready():
 	flicker_timer.wait_time = flicker_duration
 	flicker_timer.connect("timeout", self, "_on_flicker_timer_timeout")
 	
+	# Logic to drop through one-way platforms
+	if is_on_floor() and Input.is_action_just_pressed("ui_down"):
+		drop_through_one_way_platform()
+	
 	update_debug_text()
 
 func _physics_process(delta):
@@ -121,6 +127,9 @@ func handle_input(delta):
 	# Debug Replenish Charges
 	if Input.is_action_just_pressed("debug_replenish"):
 		replenish_scale_charge()
+	# Drop through one-way platforms
+	if is_on_floor() and Input.is_action_just_pressed("ui_down"):
+		drop_through_one_way_platform()
 
 
 func handle_movement(delta):
@@ -158,6 +167,30 @@ func handle_movement(delta):
 
 	velocity = move_and_slide(velocity, Vector2.UP)
 
+
+func drop_through_one_way_platform():
+	# Disable collision with the one-way platform layer
+	set_collision_mask_bit(ONE_WAY_PLATFORM_LAYER_BIT, false)
+
+	# Use a timer to re-enable collision after a short delay
+	drop_through_timer = Timer.new()
+	drop_through_timer.wait_time = 0.2  # Adjust the delay as needed
+	drop_through_timer.one_shot = true
+	add_child(drop_through_timer)
+	drop_through_timer.start()
+	drop_through_timer.connect("timeout", self, "_on_drop_through_timer_timeout")
+
+
+func _on_drop_through_timer_timeout():
+	# Re-enable collision with the one-way platform layer
+	set_collision_mask_bit(ONE_WAY_PLATFORM_LAYER_BIT, true)
+	# Remove the timer using the stored reference
+	if drop_through_timer:
+		drop_through_timer.queue_free()
+		drop_through_timer = null  # Reset the reference
+
+
+
 func handle_animation():
 	# Switch animation based on the state
 	match current_state:
@@ -169,6 +202,8 @@ func handle_animation():
 			small_sprite.play("jump")
 		PlayerState.FALL:
 			small_sprite.play("fall")
+		PlayerState.KNOCKBACK:
+			small_sprite.play("hurt")
 
 
 func toggle_scale():
