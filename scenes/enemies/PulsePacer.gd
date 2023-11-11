@@ -28,6 +28,8 @@ var is_knockback = false
 const KNOCKBACK_TIME = 0.2
 const KNOCKBACK_FORCE = Vector2(50, -150)
 
+var dust_vfx_scene = preload("res://scenes/fx/DustParticleFX.tscn")
+
 # Player reference
 onready var player = get_tree().get_nodes_in_group("player")[0]
 
@@ -56,6 +58,13 @@ func _physics_process(delta):
 			handle_moving_state(delta)
 		EnemyStates.KNOCKED_BACK:
 			handle_knockback_state(delta)
+	
+	if speed == 50 and is_on_floor():
+		if randf() < 0.05:
+			create_dust(1, Color(1, 1, 1), 4, Vector2(-5, -5), Vector2(5, 0)) # Create Dust
+	elif speed == 150 and is_on_floor():
+		if randf() < 0.15:
+			create_dust(1, Color(1, 1, 1), 4, Vector2(-5, -5), Vector2(5, 0)) # Create Dust
 
 func handle_idle_state(delta):
 	# Apply gravity even when idle to keep grounded
@@ -155,3 +164,24 @@ func take_damage(amount, direction):
 		queue_free()  # Or any other logic for when health reaches zero
 	else:
 		apply_knockback(direction)
+
+
+func create_dust(amount, color, y_offset, min_velocity=Vector2(-10, -10), max_velocity=Vector2(10, 10)):
+	for i in range(amount):
+		var dust_instance = dust_vfx_scene.instance()
+		
+		var animated_sprite = dust_instance.get_node("AnimatedSprite")
+		animated_sprite.frame = randi() % animated_sprite.frames.get_frame_count("default")
+		
+		dust_instance.z_index = self.z_index - 1  # Spawn behind the player
+		# Set the color of the dust
+		dust_instance.modulate = color
+		
+		# Position the dust around the player's feet
+		dust_instance.position = self.position + Vector2(randf() * 10 - 5, randf() * 5 + y_offset)
+		
+		# Set a random velocity for the dust within the provided range
+		dust_instance.velocity = Vector2(rand_range(min_velocity.x, max_velocity.x), rand_range(min_velocity.y, max_velocity.y))
+		
+		# Add the dust instance to the scene
+		get_parent().add_child(dust_instance)

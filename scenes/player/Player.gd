@@ -5,7 +5,8 @@ enum PlayerState {
 	RUN,
 	JUMP,
 	FALL,
-	KNOCKBACK
+	KNOCKBACK,
+	ATTACK
 }
 
 # Define a dictionary to map states to text
@@ -14,7 +15,8 @@ var state_descriptions = {
 	PlayerState.RUN: "Run",
 	PlayerState.JUMP: "Jump",
 	PlayerState.FALL: "Fall",
-	PlayerState.KNOCKBACK: "KnockBack"
+	PlayerState.KNOCKBACK: "KnockBack",
+	PlayerState.ATTACK: "Attack"
 }
 
 const SPEED = 75
@@ -54,13 +56,16 @@ var knockback_timer = Timer.new() # Handles the duration of the knockback
 var max_health = 3
 var health = max_health
 
-var camera_last_position = Vector2()
+# Attack properties
+var can_attack = true
+
 
 onready var small_sprite = $SmallSprite
 onready var small_collision = $SmallCollision
 onready var big_sprite = $BigSprite
 onready var big_collision = $BigCollision
 onready var debug_label = get_node("/root/Demo/CanvasLayer/DebugLabel")
+var dust_vfx_scene = preload("res://scenes/fx/DustParticleFX.tscn")
 
 signal player_scaled(is_small)
 
@@ -79,6 +84,11 @@ func _ready():
 	add_child(flicker_timer)
 	flicker_timer.wait_time = flicker_duration
 	flicker_timer.connect("timeout", self, "_on_flicker_timer_timeout")
+	
+	
+	# Connect animation finished signal for handling attack completion
+	small_sprite.connect("animation_finished", self, "_on_Animation_finished")
+	big_sprite.connect("animation_finished", self, "_on_Animation_finished")
 	
 	# Logic to drop through one-way platforms
 	if is_on_floor() and Input.is_action_just_pressed("ui_down"):
@@ -127,6 +137,12 @@ func handle_input(delta):
 	# Debug Replenish Charges
 	if Input.is_action_just_pressed("debug_replenish"):
 		replenish_scale_charge()
+	# Attack
+	if Input.is_action_just_pressed("attack") and current_state != PlayerState.KNOCKBACK and can_attack:
+		can_attack = !can_attack
+		velocity.y = JUMP_FORCE
+		set_state(PlayerState.ATTACK)
+	
 	# Drop through one-way platforms
 	if is_on_floor() and Input.is_action_just_pressed("ui_down"):
 		drop_through_one_way_platform()
@@ -142,6 +158,8 @@ func handle_movement(delta):
 
 	if is_on_floor():
 		if input_vector.x != 0:
+			if randf() < 0.075:
+				create_dust(1, Color(1, 1, 1), 4, Vector2(-5, -5), Vector2(5, 0)) # Create Dust
 			set_state(PlayerState.RUN)
 		else:
 			set_state(PlayerState.IDLE)
@@ -190,7 +208,6 @@ func _on_drop_through_timer_timeout():
 		drop_through_timer = null  # Reset the reference
 
 
-
 func handle_animation():
 	# Switch animation based on the state
 	match current_state:
@@ -204,6 +221,20 @@ func handle_animation():
 			small_sprite.play("fall")
 		PlayerState.KNOCKBACK:
 			small_sprite.play("hurt")
+		PlayerState.ATTACK:
+			small_sprite.play("attack")
+
+
+func _on_Animation_finished():
+	# Check if the current animation is the attack animation
+	if small_sprite.animation == "attack" or big_sprite.animation == "attack":
+		can_attack = !can_attack
+		# Directly change the state after the attack animation finishes
+		if is_on_floor():
+			current_state = PlayerState.IDLE
+		else:
+			current_state = PlayerState.FALL
+		handle_animation()  # Update the animation based on the new state
 
 
 func toggle_scale():
@@ -252,14 +283,13 @@ func update_collision_and_visibility():
 	was_big_sprite_visible = !is_small
 
 
-
 func replenish_scale_charge(amount: int = 1):
 	scale_charges = min(scale_charges + amount, MAX_SCALE_CHARGES)
 	# You can update the UI or notify the player here if needed
 
 
 func reduce_health(amount, knockback_direction):
-	if is_invincible or is_knockback:
+	if is_invincible or is_knockback or current_state == PlayerState.ATTACK:
 		return  # Ignore if the player is currently invincible or in knockback
 
 	health -= amount
@@ -313,27 +343,48 @@ func _on_knockback_timer_timeout():
 		set_state(PlayerState.IDLE)  # Return to IDLE or any other appropriate state
 
 func set_state(new_state):
+	# Ignore state change if currently attacking
+	if current_state == PlayerState.ATTACK:
+		return
+		
 	current_state = new_state
 	if new_state != PlayerState.KNOCKBACK:
 		is_knockback = false
 
 
 func die():
-	# Check if the Camera2D is still a valid node
-	if $Camera2D:
-		# Store the current camera position
-		camera_last_position = $Camera2D.global_position
-
-		# Detach the Camera2D from the player
-		var camera = $Camera2D
-		camera.get_parent().remove_child(camera)
-
-		# Immediately set the camera position after detaching
-		camera.global_position = camera_last_position
-
-		# Add the camera to the root node
-		get_tree().get_root().add_child(camera)
-
 	# Then free the player
 	queue_free()
 
+
+func create_dust(amount, color, y_offset, min_velocity=Vector2(-10, -10), max_velocity=Vector2(10, 10)):
+	for i in range(amount):
+		var dust_instance = dust_vfx_scene.instance()
+		
+		var animated_sprite = dust_instance.get_node("AnimatedSprite")
+		animated_sprite.frame = randi() % animated_sprite.frames.get_frame_count("default")
+		
+		dust_instance.z_index = self.z_index - 1  # Spawn behind the player
+		# Set the color of the dust
+		dust_instance.modulate = color
+		
+		# Position the dust around the player's feet
+		dust_instance.position = self.position + Vector2(randf() * 10 - 5, randf() * 5 + y_offset)
+		
+		# Set a random velocity for the dust within the provided range
+		dust_instance.velocity = Vector2(rand_range(min_velocity.x, max_velocity.x), rand_range(min_velocity.y, max_velocity.y))
+		
+		# Add the dust instance to the scene
+		get_parent().add_child(dust_instance)
+
+
+func _on_HitBox_body_entered(body):
+	if current_state == PlayerState.ATTACK:
+		if body.is_in_group("enemies"):
+			# Calculate the horizontal knockback direction based on the relative positions
+			var knockback_direction = Vector2.ZERO
+			# Use a set upward force for the vertical knockback
+			velocity.y = JUMP_FORCE * 1.25
+			knockback_direction.x = -sign(global_position.x - body.global_position.x)  # Left (-1) or Right (1)
+			# Now call the enemy's take_damage function with the calculated direction
+			body.take_damage(1,knockback_direction)

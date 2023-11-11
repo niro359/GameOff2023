@@ -113,6 +113,7 @@ margin_bottom = 14.0
 
 [node name="Player" parent="." instance=ExtResource( 1 )]
 position = Vector2( 15, 142 )
+z_index = 2
 __meta__ = {
 "_edit_group_": true
 }
@@ -174,6 +175,8 @@ one_way_collision = true
 
 [node name="PulsePacer" parent="." instance=ExtResource( 2 )]
 position = Vector2( -67, 101 )
+z_index = 1
 
 [node name="SneakShooter" parent="." instance=ExtResource( 3 )]
 position = Vector2( 174, 143 )
+z_index = 1
