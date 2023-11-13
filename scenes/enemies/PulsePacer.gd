@@ -114,6 +114,7 @@ func handle_knockback_state(delta):
 
 func apply_knockback(direction):
 	current_state = EnemyStates.KNOCKED_BACK
+	$Sprite.flip_h = -direction.x != 1
 	is_knockback = true
 	var vertical_force = Vector2(0, -150)
 	knockback_velocity = KNOCKBACK_FORCE * direction.normalized() + vertical_force
@@ -150,10 +151,7 @@ func _on_HitBox_body_entered(body):
 		# Calculate the horizontal knockback direction based on the relative positions
 		var knockback_direction = Vector2.ZERO
 		knockback_direction.x = -sign(global_position.x - body.global_position.x)  # Left (-1) or Right (1)
-		$Sprite.flip_h = knockback_direction.x != 1
-		direction = knockback_direction.x
 		# Now call the player's reduce_health function with the calculated direction
-		take_damage(1,-knockback_direction)
 		body.reduce_health(1, knockback_direction)
 
 

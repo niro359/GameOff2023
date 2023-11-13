@@ -29,7 +29,6 @@ var projectile_rotation_degrees : float = 0
 const SAME_LEVEL_THRESHOLD = 100  # pixels, adjust as needed
 
 onready var player = get_tree().get_nodes_in_group("player")[0]
-# At the top of your enemy script
 onready var player_ref = weakref(player)
 var is_player_small = false
 
@@ -88,12 +87,13 @@ func handle_active_state(delta):
 	# Apply gravity
 	velocity.y += gravity * delta
 	velocity = move_and_slide(velocity, Vector2.UP)
-	
-	# Flip the sprite based on player position
-	if player.global_position.x < global_position.x:
-		$Sprite.flip_h = true  # Player is to the left
-	else:
-		$Sprite.flip_h = false  # Player is to the right
+	var player_instance = player_ref.get_ref()
+	if player_instance:
+		# Flip the sprite based on player position
+		if player.global_position.x < global_position.x:
+			$Sprite.flip_h = true  # Player is to the left
+		else:
+			$Sprite.flip_h = false  # Player is to the right
 
 	# Check if the player is on the same level
 	var vertical_distance = abs(player.global_position.y - global_position.y)
@@ -138,10 +138,7 @@ func _on_HitBox_body_entered(body):
 		# Calculate the horizontal knockback direction based on the relative positions
 		var knockback_direction = Vector2.ZERO
 		knockback_direction.x = -sign(global_position.x - body.global_position.x)  # Left (-1) or Right (1)
-		$Sprite.flip_h = knockback_direction.x != 1
-		direction = knockback_direction.x
 		# Now call the player's reduce_health function with the calculated direction
-		take_damage(1,-knockback_direction)
 		body.reduce_health(1, knockback_direction)
 
 
@@ -162,6 +159,7 @@ func handle_knockback_state(delta):
 
 func apply_knockback(direction):
 	current_state = States.KNOCKED_BACK
+	$Sprite.flip_h = direction.x != 1
 	is_knockback = true
 	var vertical_force = Vector2(0, -150)
 	knockback_velocity = KNOCKBACK_FORCE * direction.normalized() + vertical_force
