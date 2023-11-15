@@ -64,6 +64,8 @@ onready var small_collision = $SmallCollision
 onready var big_collision = $BigCollision
 onready var debug_label = get_node("/root/Demo/CanvasLayer/DebugLabel")
 var dust_vfx_scene = preload("res://scenes/fx/DustParticleFX.tscn")
+var jump_vfx_scene = preload("res://scenes/fx/JumpFX.tscn")
+var land_vfx_scene = preload("res://scenes/fx/LandFX.tscn")
 
 signal player_scaled(is_small)
 
@@ -125,6 +127,16 @@ func apply_gravity(delta):
 func handle_input(delta):
 	# Check for jump input
 	if Input.is_action_just_pressed("ui_up") and is_on_floor():
+		if is_small:
+			var jump_vfx = jump_vfx_scene.instance()
+			get_tree().current_scene.add_child(jump_vfx)
+			jump_vfx.position = self.position + Vector2(0, -1)
+			jump_vfx.z_index = self.z_index - 1
+		else:
+			var jump_vfx = jump_vfx_scene.instance()
+			get_tree().current_scene.add_child(jump_vfx)
+			jump_vfx.position = self.position + Vector2(0, 4)
+			jump_vfx.z_index = self.z_index - 1
 		jump_pressed = true
 	elif Input.is_action_just_released("ui_up"):
 		jump_pressed = false
@@ -164,6 +176,8 @@ func handle_run_state(delta):
 	handle_horizontal_movement()
 	handle_attack()
 	
+	if randf() < 0.05:
+		create_dust(1, Color(1, 1, 1), 4, 1, Vector2(-5, -5), Vector2(5, 0)) # Create Dust
 	if jump_pressed and is_on_floor():
 		set_state(PlayerState.JUMP)
 		jump_timer = 0.0
@@ -197,6 +211,16 @@ func handle_fall_state(delta):
 	handle_attack()
 	
 	if is_on_floor():
+		if is_small:
+			var land_vfx = land_vfx_scene.instance()
+			get_tree().current_scene.add_child(land_vfx)
+			land_vfx.position = self.position + Vector2(0, -2)
+			land_vfx.z_index = self.z_index - 1
+		else:
+			var land_vfx = land_vfx_scene.instance()
+			get_tree().current_scene.add_child(land_vfx)
+			land_vfx.position = self.position + Vector2(0, 4)
+			land_vfx.z_index = self.z_index - 1
 		set_state(PlayerState.IDLE)
 
 	handle_animation()
@@ -237,43 +261,6 @@ func handle_attack():
 			velocity.y = JUMP_FORCE
 #		sprite.frame = 0
 		set_state(PlayerState.ATTACK)
-
-#func handle_movement(delta):
-#	var input_vector = Vector2.ZERO
-#	input_vector.x = Input.get_action_strength("ui_right") - Input.get_action_strength("ui_left")
-#	input_vector = input_vector.normalized()
-#
-#	velocity.x = input_vector.x * SPEED
-#	velocity.y += GRAVITY * delta
-#
-#	if is_on_floor():
-#		if input_vector.x != 0:
-#			if randf() < 0.075:
-#				create_dust(1, Color(1, 1, 1), 4, Vector2(-5, -5), Vector2(5, 0)) # Create Dust
-#			set_state(PlayerState.RUN)
-#		else:
-#			set_state(PlayerState.IDLE)
-#
-#		if jump_pressed:
-#			velocity.y = JUMP_FORCE
-#			jump_timer = 0.0
-#
-#	else:
-#		if velocity.y < 0:
-#			set_state(PlayerState.JUMP)
-#		else:
-#			set_state(PlayerState.FALL)
-#
-#		if jump_pressed and jump_timer < MAX_JUMP_TIME:
-#			velocity.y = JUMP_FORCE
-#			jump_timer += delta
-#
-#	# Flip sprite based on movement direction
-#	if input_vector.x != 0:
-#		small_sprite.scale.x = sign(input_vector.x)
-#		big_sprite.scale.x = small_sprite.scale.x
-#
-#	velocity = move_and_slide(velocity, Vector2.UP)
 
 
 func drop_through_one_way_platform():
@@ -346,7 +333,7 @@ func toggle_scale():
 	if scale_charges <= 0:
 		print("No scale charges left")
 		return  # Do not change scale if there are no charges left
-		
+	
 	# Only check for space if the player is small and trying to grow
 	if is_small:
 		var space_state = get_world_2d().direct_space_state
@@ -372,6 +359,7 @@ func toggle_scale():
 	# If there's enough room or if shrinking, proceed with scaling
 	is_small = !is_small
 	scale_charges -= 1  # Consume a charge
+	create_dust(5, Color(1, 1, 1), 0, -1, Vector2(-10, -10), Vector2(10, -5)) # Create Dust
 	update_collision_and_visibility()
 	velocity.y = JUMP_FORCE
 	if current_state == PlayerState.ATTACK:
@@ -461,14 +449,14 @@ func die():
 	queue_free()
 
 
-func create_dust(amount, color, y_offset, min_velocity=Vector2(-10, -10), max_velocity=Vector2(10, 10)):
+func create_dust(amount, color, y_offset, z_index_offset, min_velocity=Vector2(-10, -10), max_velocity=Vector2(10, 10)):
 	for i in range(amount):
 		var dust_instance = dust_vfx_scene.instance()
 		
 		var animated_sprite = dust_instance.get_node("AnimatedSprite")
 		animated_sprite.frame = randi() % animated_sprite.frames.get_frame_count("default")
 		
-		dust_instance.z_index = self.z_index - 1  # Spawn behind the player
+		dust_instance.z_index = self.z_index - z_index_offset  # Spawn behind the player
 		# Set the color of the dust
 		dust_instance.modulate = color
 		

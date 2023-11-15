@@ -159,7 +159,7 @@ func handle_knockback_state(delta):
 
 func apply_knockback(direction):
 	current_state = States.KNOCKED_BACK
-	$Sprite.flip_h = direction.x != 1
+	$Sprite.flip_h = -direction.x != 1
 	is_knockback = true
 	var vertical_force = Vector2(0, -150)
 	knockback_velocity = KNOCKBACK_FORCE * direction.normalized() + vertical_force
